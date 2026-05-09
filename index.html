@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relationship Update 0.5</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+
+  :root {
+    --bg: #000;
+    --card: rgba(28,28,30,0.92);
+    --card-border: rgba(255,255,255,0.12);
+    --text: #fff;
+    --text-secondary: rgba(255,255,255,0.55);
+    --text-tertiary: rgba(255,255,255,0.35);
+    --blue: #0A84FF;
+    --divider: rgba(255,255,255,0.1);
+    --green: #30D158;
+    --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(10,132,255,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(48,209,88,0.08) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .noise {
+    position: fixed; inset: 0; opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  .screen {
+    display: none; width: 100%; max-width: 380px;
+    flex-direction: column; gap: 10px;
+    position: relative; z-index: 1;
+  }
+  .screen.active { display: flex; }
+
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 6px; margin-bottom: 4px;
+    font-size: 12px; font-weight: 600; color: var(--text);
+  }
+  .status-right { display: flex; align-items: center; gap: 6px; }
+  .bat-body {
+    width: 22px; height: 11px;
+    border: 1.5px solid rgba(255,255,255,0.7); border-radius: 2.5px;
+    position: relative; display: flex; align-items: center; padding: 1.5px;
+  }
+  .bat-body::after {
+    content: ''; position: absolute; right: -4px; top: 50%; transform: translateY(-50%);
+    width: 2px; height: 5px; background: rgba(255,255,255,0.5); border-radius: 0 1px 1px 0;
+  }
+  .bat-fill { height: 100%; width: 75%; background: rgba(255,255,255,0.8); border-radius: 1px; }
+
+  .card {
+    background: var(--card); border: 0.5px solid var(--card-border);
+    border-radius: 20px; backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px); overflow: hidden;
+  }
+
+  .card-main-content { padding: 20px 20px 0; }
+
+  .app-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .app-icon {
+    width: 52px; height: 52px; border-radius: 12px;
+    background: linear-gradient(145deg, #1c1c2e 0%, #2d1b4e 50%, #1a1a3e 100%);
+    border: 0.5px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0; position: relative; overflow: hidden;
+  }
+  .app-icon::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+  }
+  .app-meta { flex: 1; min-width: 0; }
+  .app-name { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; line-height: 1.2; margin-bottom: 3px; }
+  .app-sub { font-size: 13px; color: var(--text-secondary); letter-spacing: -0.1px; }
+  .version-badge {
+    font-size: 11px; font-weight: 600; color: var(--blue);
+    background: rgba(10,132,255,0.12); border: 0.5px solid rgba(10,132,255,0.3);
+    padding: 3px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+  }
+
+  .divider { height: 0.5px; background: var(--divider); margin: 0 0 16px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+    letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  .features-list { list-style: none; display: flex; flex-direction: column; margin-bottom: 20px; }
+  .feature-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 0; border-bottom: 0.5px solid var(--divider);
+  }
+  .feature-item:last-child { border-bottom: none; }
+  .feature-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); margin-top: 5px; flex-shrink: 0; }
+  .feature-item.bug .feature-dot { background: var(--green); }
+  .feature-text { font-size: 14.5px; line-height: 1.5; letter-spacing: -0.1px; }
+  .feature-tag {
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px;
+    margin-left: 6px; vertical-align: middle; letter-spacing: 0.03em;
+    background: rgba(48,209,88,0.15); color: var(--green); border: 0.5px solid rgba(48,209,88,0.3);
+  }
+
+  .size-info {
+    display: flex; justify-content: space-between; padding: 12px 20px;
+    border-top: 0.5px solid var(--divider); background: rgba(255,255,255,0.02);
+  }
+  .size-item { text-align: center; }
+  .size-value { font-size: 13px; font-weight: 500; display: block; }
+  .size-label { font-size: 11px; color: var(--text-tertiary); display: block; margin-top: 1px; }
+
+  .btn {
+    width: 100%; padding: 16px 20px;
+    background: transparent; border: none; color: var(--blue);
+    font-family: var(--font); font-size: 17px; font-weight: 500;
+    cursor: pointer; letter-spacing: -0.2px;
+    transition: background 0.15s ease; -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { background: rgba(255,255,255,0.08); }
+  .btn-secondary { color: var(--text-secondary); font-size: 15px; font-weight: 400; padding: 14px 20px; }
+  .btn-ghost { color: rgba(255,255,255,0.4); font-size: 14px; font-weight: 400; padding: 12px 20px; }
+
+  .btn-row { display: flex; border-top: 0.5px solid var(--divider); }
+  .btn-row .btn { font-size: 15px; border-right: 0.5px solid var(--divider); }
+  .btn-row .btn:last-child { border-right: none; }
+
+  .progress-container { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .progress-label { display: flex; justify-content: space-between; align-items: center; }
+  .progress-text { font-size: 13px; color: var(--text-secondary); }
+  .progress-pct { font-size: 13px; font-weight: 500; color: var(--blue); }
+  .progress-track { height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: var(--blue); border-radius: 2px; transition: width 0.08s linear; }
+  .progress-step { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; min-height: 16px; transition: opacity 0.3s; }
+
+  .toast {
+    position: fixed; top: 60px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: rgba(44,44,46,0.97); border: 0.5px solid rgba(255,255,255,0.15);
+    border-radius: 14px; padding: 16px 20px; z-index: 200;
+    text-align: center; min-width: 230px; max-width: 300px;
+    backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+    opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .toast-title { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+  .toast-msg { font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
+  .toast-ok {
+    width: 100%; padding: 9px; background: var(--blue); border: none;
+    border-radius: 8px; color: #fff; font-family: var(--font);
+    font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .toast-ok:active { opacity: 0.85; }
+
+  .success-inner {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; padding: 32px 24px; gap: 10px;
+  }
+  .success-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(48,209,88,0.15); border: 0.5px solid rgba(48,209,88,0.4);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
+  }
+  .checkmark {
+    width: 28px; height: 28px; stroke: var(--green); stroke-width: 2.5;
+    stroke-linecap: round; stroke-linejoin: round; fill: none;
+    stroke-dasharray: 40; stroke-dashoffset: 40;
+  }
+  .success-title { font-size: 19px; font-weight: 600; letter-spacing: -0.3px; }
+  .success-sub { font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 260px; }
+  .anniversary-date { font-size: 13px; color: var(--blue); font-weight: 500; }
+
+  .timer-strip { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .timer-unit {
+    display: flex; flex-direction: column; align-items: center; min-width: 52px;
+    background: rgba(255,255,255,0.06); border-radius: 10px; padding: 8px 6px 6px;
+    border: 0.5px solid rgba(255,255,255,0.08);
+  }
+  .timer-num { font-size: 20px; font-weight: 300; letter-spacing: -0.5px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .timer-label { font-size: 9px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+
+  .heart-row { display: flex; gap: 4px; margin-top: 4px; }
+  .h { font-size: 14px; }
+  .h:nth-child(1) { animation: heartbeat 1.5s ease-in-out infinite; }
+  .h:nth-child(2) { animation: heartbeat 1.5s ease-in-out 0.2s infinite; }
+  .h:nth-child(3) { animation: heartbeat 1.5s ease-in-out 0.4s infinite; }
+
+  .notes-inner { padding: 28px 24px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .notes-tag {
+    font-size: 10px; font-weight: 600; color: var(--blue);
+    background: rgba(10,132,255,0.12); border: 0.5px solid rgba(10,132,255,0.25);
+    padding: 3px 10px; border-radius: 20px; align-self: flex-start;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .notes-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .notes-body {
+    font-size: 14.5px; line-height: 1.85; color: var(--text-secondary);
+    border-left: 2px solid rgba(10,132,255,0.4); padding-left: 14px;
+    max-height: 52vh; overflow-y: auto; padding-right: 4px;
+  }
+  .notes-body::-webkit-scrollbar { width: 3px; }
+  .notes-body::-webkit-scrollbar-track { background: transparent; }
+  .notes-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  .notes-sig { font-size: 13px; color: var(--text-tertiary); text-align: right; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.25); }
+  }
+  @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+  @keyframes scaleIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  .a1 { animation: fadeUp 0.55s cubic-bezier(0.23,1,0.32,1) 0.05s both; }
+  .a2 { animation: fadeUp 0.55s cubic-bezier(0.23,1,0.32,1) 0.15s both; }
+  .a3 { animation: fadeUp 0.55s cubic-bezier(0.23,1,0.32,1) 0.25s both; }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<!-- SCREEN 1: MAIN -->
+<div class="screen active" id="screenMain">
+  <div class="status-bar a1">
+    <span id="clock">9:41</span>
+    <div class="status-right">
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="white" opacity="0.9">
+        <rect x="0" y="6" width="3" height="6" rx="0.5" opacity="0.4"/>
+        <rect x="4.5" y="4" width="3" height="8" rx="0.5" opacity="0.6"/>
+        <rect x="9" y="2" width="3" height="10" rx="0.5" opacity="0.8"/>
+        <rect x="13.5" y="0" width="3" height="12" rx="0.5"/>
+      </svg>
+      <svg width="16" height="12" viewBox="0 0 24 16" fill="white" opacity="0.9">
+        <path d="M12 3C8.5 3 5.3 4.4 3 6.7L1 4.7C3.8 2 7.7 0 12 0s8.2 2 11 4.7l-2 2C18.7 4.4 15.5 3 12 3z" opacity="0.4"/>
+        <path d="M12 7c-2.4 0-4.6 1-6.2 2.6L4 7.8C6.1 5.7 8.9 4.4 12 4.4s5.9 1.3 8 3.4l-1.8 1.8C16.6 8 14.4 7 12 7z" opacity="0.6"/>
+        <path d="M12 11c-1.4 0-2.7.6-3.6 1.5L12 16l3.6-3.5C14.7 11.6 13.4 11 12 11z"/>
+      </svg>
+      <div class="bat-body"><div class="bat-fill"></div></div>
+    </div>
+  </div>
+
+  <div class="card a1">
+    <div class="card-main-content">
+      <div class="app-header">
+        <div class="app-icon">💌</div>
+        <div class="app-meta">
+          <div class="app-name">Relationship Update</div>
+          <div class="app-sub">Version 0.5 · 2025</div>
+        </div>
+        <div class="version-badge">NEW</div>
+      </div>
+      <div class="divider"></div>
+      <div class="section-label">What's New</div>
+      <ul class="features-list">
+        <li class="feature-item"><div class="feature-dot"></div><span class="feature-text">More hugs</span></li>
+        <li class="feature-item"><div class="feature-dot"></div><span class="feature-text">More trips together</span></li>
+        <li class="feature-item"><div class="feature-dot"></div><span class="feature-text">Better memories</span></li>
+        <li class="feature-item bug"><div class="feature-dot"></div><span class="feature-text">Bug fixed: missing you too much <span class="feature-tag">FIX</span></span></li>
+      </ul>
+    </div>
+    <div class="size-info">
+      <div class="size-item"><span class="size-value">∞</span><span class="size-label">Size</span></div>
+      <div class="size-item"><span class="size-value">0.5</span><span class="size-label">Version</span></div>
+      <div class="size-item"><span class="size-value">Nov 9</span><span class="size-label">Since</span></div>
+      <div class="size-item"><span class="size-value">4+</span><span class="size-label">Rating</span></div>
+    </div>
+  </div>
+
+  <div class="card a2" id="installCard">
+    <button class="btn" id="installBtn" onclick="startInstall()">Install Love Update</button>
+    <div class="progress-container" id="progressContainer" style="display:none;">
+      <div class="progress-label">
+        <span class="progress-text" id="progressText">Preparing…</span>
+        <span class="progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-step" id="progressStep">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="card a3" id="laterCard">
+    <button class="btn btn-secondary" onclick="remindLater()">Remind Me Later</button>
+  </div>
+</div>
+
+<!-- SCREEN 2: SUCCESS -->
+<div class="screen" id="screenSuccess">
+  <div class="card a1">
+    <div class="success-inner">
+      <div class="success-icon" style="animation: scaleIn 0.4s cubic-bezier(0.23,1,0.32,1) 0.1s both;">
+        <svg class="checkmark" viewBox="0 0 28 28" style="animation: drawCheck 0.45s ease 0.4s forwards;">
+          <polyline points="5,14 11,20 23,8"/>
+        </svg>
+      </div>
+      <div class="success-title">Update Successful</div>
+      <div class="success-sub">Happy Anniversary, my love.<br>Here's to every version of us.</div>
+      <div class="anniversary-date" id="anniversaryDate"></div>
+      <div class="timer-strip" id="timerStrip"></div>
+      <div class="heart-row">
+        <span class="h">♥</span><span class="h">♥</span><span class="h">♥</span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="resetAll()">Update Again</button>
+      <button class="btn" onclick="goNotes()">Release Notes</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 3: RELEASE NOTES -->
+<div class="screen" id="screenNotes">
+  <div class="card a1">
+    <div class="notes-inner">
+      <div class="notes-tag">Release Notes · v0.5</div>
+      <div class="notes-title">Hi Marcus，</div>
+      <div class="notes-body">
+        恭喜我，已经成为你女朋友半年啦。<br><br>
+        越来越习惯有你在身边了。看到你的时候会觉得很安心，心里也会对未来多很多期待。每次依偎在你身边的时候，我都会忍不住想：如果能一直这样就好了。<br><br>
+        我真的很喜欢你身上的很多特质。你优秀、认真，擅长分析问题，也很温柔、很有耐心。你让我看到一种很坚定、很可靠的内核，也让我越来越崇拜你。虽然你有时候有点色色的，但是我也好喜欢这样真实又可爱的你。<br><br>
+        谢谢你一直肯定我、鼓励我，让我慢慢发现自己身上的优点。也谢谢你带我体验了很多以前没有体验过的事情，让我的生活变得更丰富了。<br><br>
+        很感恩可以遇到你，感恩你和我一样，在认真经营着我们的小世界。对我来说，这些幸福都非常珍贵，也非常特别。<br><br>
+        希望我们以后都能继续朝着各自的目标努力前行，也能一直陪伴彼此。想和你去很多很多地方，吃好多好多顿饭，走很远很远的路，一起经历更多属于我们的日子。<br><br>
+        对你的爱只增不减，越来越浓烈。<br><br>
+        我们会一直一直走下去的。<br><br>
+        真的非常爱你。
+      </div>
+      <div class="notes-sig">你的 Tiannan ♥</div>
+    </div>
+    <div style="border-top: 0.5px solid var(--divider);">
+      <button class="btn btn-ghost" onclick="resetAll()">↩ Update Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-title">⚠️ Don't click me!</div>
+  <div class="toast-msg">This button is not for you.<br>Go install the update instead.</div>
+  <button class="toast-ok" onclick="hideToast()">OK fine…</button>
+</div>
+
+<script>
+  const START = new Date('2025-11-09T00:00:00');
+  let timerIv = null;
+
+  /* clock */
+  function updateClock() {
+    const n = new Date();
+    document.getElementById('clock').textContent = n.getHours() + ':' + String(n.getMinutes()).padStart(2,'0');
+  }
+  updateClock(); setInterval(updateClock, 10000);
+
+  /* screens */
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(id);
+    el.classList.add('active');
+    el.querySelectorAll('.a1,.a2,.a3').forEach(e => { e.style.animation='none'; void e.offsetWidth; e.style.animation=''; });
+  }
+
+  /* toast */
+  function remindLater() { document.getElementById('toast').classList.add('show'); }
+  function hideToast()   { document.getElementById('toast').classList.remove('show'); }
+
+  /* install */
+  const STEPS = [
+    'Backing up memories…',
+    'Installing more hugs…',
+    'Optimizing happiness…',
+    'Removing distances…',
+    'Preparing surprise…',
+  ];
+  const STEP_AT = [0, 20, 42, 65, 84];
+
+  function startInstall() {
+    document.getElementById('installBtn').style.display = 'none';
+    document.getElementById('progressContainer').style.display = 'flex';
+    document.getElementById('laterCard').style.cssText += 'opacity:0.35;pointer-events:none;';
+
+    const fill = document.getElementById('progressFill');
+    const pct  = document.getElementById('progressPct');
+    const txt  = document.getElementById('progressText');
+    const step = document.getElementById('progressStep');
+
+    let p = 0, lastStepIdx = -1;
+
+    const iv = setInterval(() => {
+      p += Math.random() * 2.6 + 0.4;
+      if (p >= 100) {
+        p = 100; clearInterval(iv);
+        fill.style.width = '100%'; pct.textContent = '100%';
+        txt.textContent = 'Finalizing…'; step.textContent = '';
+        setTimeout(showSuccess, 650);
+        return;
+      }
+
+      fill.style.width = p + '%';
+      pct.textContent = Math.floor(p) + '%';
+
+      /* progress label */
+      if (p < 30) txt.textContent = 'Downloading…';
+      else if (p < 58) txt.textContent = 'Installing…';
+      else if (p < 84) txt.textContent = 'Applying updates…';
+      else txt.textContent = 'Almost there…';
+
+      /* step messages */
+      let si = -1;
+      for (let i = STEP_AT.length - 1; i >= 0; i--) { if (p >= STEP_AT[i]) { si = i; break; } }
+      if (si !== lastStepIdx && si < STEPS.length) {
+        lastStepIdx = si;
+        step.style.opacity = '0';
+        setTimeout(() => { step.textContent = STEPS[si]; step.style.opacity = '1'; }, 250);
+      }
+    }, 70);
+  }
+
+  /* success */
+  function showSuccess() {
+    if (timerIv) { clearInterval(timerIv); timerIv = null; }
+    const now = new Date();
+    const diff = Math.abs(now - START);
+    const days = Math.floor(diff / 86400000);
+    const dateEl = document.getElementById('anniversaryDate');
+    dateEl.textContent = now >= START
+      ? (days === 0 ? 'Today is the day — November 9, 2025 ♥' : 'Day ' + days + ' together · since November 9, 2025')
+      : days + ' days until November 9, 2025 ♥';
+    renderTimer();
+    timerIv = setInterval(renderTimer, 1000);
+    showScreen('screenSuccess');
+  }
+
+  function renderTimer() {
+    const d = Math.abs(new Date() - START);
+    const units = [
+      { v: Math.floor(d/86400000),              l:'Days' },
+      { v: Math.floor((d%86400000)/3600000),    l:'Hours' },
+      { v: Math.floor((d%3600000)/60000),       l:'Mins' },
+      { v: Math.floor((d%60000)/1000),          l:'Secs' },
+    ];
+    const strip = document.getElementById('timerStrip');
+    if (strip) strip.innerHTML = units.map(u =>
+      `<div class="timer-unit"><span class="timer-num">${String(u.v).padStart(2,'0')}</span><span class="timer-label">${u.l}</span></div>`
+    ).join('');
+  }
+
+  /* release notes */
+  function goNotes() { showScreen('screenNotes'); }
+
+  /* reset */
+  function resetAll() {
+    if (timerIv) { clearInterval(timerIv); timerIv = null; }
+    document.getElementById('installBtn').style.display = '';
+    document.getElementById('progressContainer').style.display = 'none';
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressPct').textContent = '0%';
+    document.getElementById('progressText').textContent = 'Preparing…';
+    document.getElementById('progressStep').textContent = '\u00a0';
+    const lc = document.getElementById('laterCard');
+    lc.style.opacity = ''; lc.style.pointerEvents = '';
+    showScreen('screenMain');
+  }
+</script>
+</body>
+</html>
